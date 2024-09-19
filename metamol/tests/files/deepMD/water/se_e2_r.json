@@ -1,0 +1,96 @@
+{
+    "model": {
+        "descriptor": {
+            "type": "se_e2_r",
+            "rcut": 5.0,
+            "sel": "auto",
+            "rcut_smth": 0.5,
+            "neuron": [
+                10,
+                20,
+                40
+            ],
+            "activation_function": "tanh",
+            "resnet_dt": false,
+            "type_one_side": false,
+            "precision": "float64",
+            "trainable": true,
+            "exclude_types": [],
+            "set_davg_zero": false
+        },
+        "fitting_net": {
+            "type": "ener",
+            "numb_fparam": 0,
+            "numb_aparam": 0,
+            "neuron": [
+                120,
+                120,
+                120
+            ],
+            "activation_function": "tanh",
+            "precision": "float64",
+            "resnet_dt": true,
+            "trainable": true,
+            "rcond": 0.001,
+            "atom_ener": []
+        },
+        "data_stat_nbatch": 10,
+        "data_stat_protect": 0.01
+    },
+    "learning_rate": {
+        "scale_by_worker": "linear",
+        "type": "exp",
+        "start_lr": 0.001,
+        "stop_lr": 1e-08,
+        "decay_steps": 5000
+    },
+    "loss": {
+        "type": "ener",
+        "start_pref_e": 0.02,
+        "limit_pref_e": 1.0,
+        "start_pref_f": 1000,
+        "limit_pref_f": 1.0,
+        "start_pref_v": 0.0,
+        "limit_pref_v": 0.0,
+        "start_pref_ae": 0.0,
+        "limit_pref_ae": 0.0,
+        "start_pref_pf": 0.0,
+        "limit_pref_pf": 0.0
+    },
+    "training": {
+        "training_data": {
+            "systems": [
+                "../data/data_0/",
+                "../data/data_1/",
+                "../data/data_2/"
+            ],
+            "set_prefix": "set",
+            "batch_size": "auto",
+            "auto_prob": "prob_sys_size",
+            "sys_probs": null
+        },
+        "numb_steps": 1000000,
+        "validation_data": {
+            "systems": [
+                "../data/data_3/"
+            ],
+            "set_prefix": "set",
+            "batch_size": "auto",
+            "auto_prob": "prob_sys_size",
+            "sys_probs": null,
+            "numb_btch": 1
+        },
+        "disp_file": "lcurve.out",
+        "disp_freq": 15,
+        "save_freq": 1000,
+        "save_ckpt": "model.ckpt",
+        "disp_training": true,
+        "time_training": true,
+        "profiling": false,
+        "profiling_file": "timeline.json",
+        "enable_profiler": false,
+        "tensorboard": false,
+        "tensorboard_log_dir": "log",
+        "tensorboard_freq": 1
+    }
+}

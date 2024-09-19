@@ -1,0 +1,64 @@
+clear
+
+units real
+
+dimension 3
+
+boundary p p f
+
+atom_style full
+
+pair_style lj/long/coul/long long long 15.0
+
+pair_modify mix geometric
+
+pair_modify table 0
+
+pair_modify table/disp 0
+
+bond_style harmonic
+
+angle_style harmonic
+
+dihedral_style charmm
+
+read_data HDI.data
+
+special_bonds lj 0.0 0.0 0.5 coul 0.0 0.0 0.833333333
+
+group PFPE type 1:6
+
+group COC type 7
+
+velocity PFPE create 300.0 4928459 dist gaussian
+
+velocity COC zero linear 
+
+kspace_style ewald/disp 5.0e-6
+
+kspace_modify slab 3.0
+
+neighbor 2.0 bin
+
+neigh_modify	every 1 delay 0 check yes one 4000
+
+compute		T PFPE temp
+
+fix		1 COC setforce 0.0 0.0 0.0
+
+thermo 10
+
+thermo_style custom step temp c_T press vol density pe ke evdwl ecoul epair ebond eangle edihed eimp emol elong etotal atoms
+
+thermo_modify lost error norm no
+
+timestep 1.0
+
+minimize 1.0e-4 1.0e-6 100 1000
+
+fix 2 PFPE nvt temp 300.0 300.0 100.0
+
+run 2000
+
+write_data HDI_out.data
+

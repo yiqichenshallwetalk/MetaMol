@@ -1,0 +1,26 @@
+name: metamol
+channels:
+  - conda-forge
+dependencies:
+  - ele
+  - numpy
+  - packmol=20.010
+  - parmed=3.4.4
+  - python=3.8
+  - rdkit
+  - scipy
+  - swig
+  - doxygen
+  - mdtraj
+  - openmm>=7.7
+  - foyer
+  - openmmtools
+  - ambertools=22.5
+  - networkx
+  - mpi4py
+  - py3dmol
+  - pytest
+  - cython
+  - mbuild
+  - unyt=2.8.0
+  - pydflow
