@@ -18,7 +18,7 @@ from dflow.python import OP, OPIO, Artifact, OPIOSign, PythonOPTemplate, Paramet
 
 from metamol.utils.execute import runCommands
 from metamol.utils.help_functions import MetaError
-from metamol.workflows.utils import add_path
+from metamol.workflows.utils import add_path, _write_ions_mdp
 
 class Solvate(OP):
     def __init__(self):
@@ -30,6 +30,9 @@ class Solvate(OP):
             "GMX": Parameter(str),
             "box": Parameter(List[float]),
             "screen": Parameter(bool, default=False),
+            "add_ions": Parameter(bool, default=True),
+            "ion_conc": Parameter(float, default=0.15),
+            "sol_group": Parameter(int, default=15),
             "inp_gro": Artifact(Path),
             "inp_top": Artifact(Path),
         })
@@ -45,20 +48,46 @@ class Solvate(OP):
     def execute(self, op_in: OPIO, ) -> OPIO:
         GMX = op_in["GMX"]
         inp_gro = op_in["inp_gro"]
-        inp_top = op_in["inp_top"]
+        file = op_in["inp_top"]
+        os.system("cp {0} .".format(str(file)))
+        inp_top = str(file).split('/')[-1]
         screen = op_in["screen"]
         box = op_in["box"]
-        out_gros = []
 
         solvate_commands = GMX + " --nobackup solvate -cp " + str(inp_gro) + " -p " + str(inp_top) + " -box " + " ".join([str(x) for x in box]) + " -o solvated.gro"
         runCommands(solvate_commands, screen=screen)
-        out_gros.append(Path("solvated.gro"))
+        
+        # insert include water itp in top file
+        with open(inp_top, 'r') as file:
+            data = file.read()
+        if not '#include "amber99sb-ildn.ff/tip3p.itp"' in data:
+            data = data.replace('[ system ]\n', '#include "amber99sb-ildn.ff/tip3p.itp"\n\n[ system ]\n')
+            with open(inp_top, 'w') as file:
+                file.write(data)
+        
+        out_gro = [Path("solvated.gro")]
+        
+        if op_in["add_ions"]:
+            # Add ions to the system
+            _write_ions_mdp()
+            runCommands(GMX + " grompp -f ions.mdp -c solvated.gro -p " + str(inp_top) + " -o ions_inp.tpr", screen=screen)
+            ions_commands = "echo " + str(op_in["sol_group"]) + "| " + GMX + " genion -s ions_inp.tpr -o solvated_ions.gro -neutral -conc " + str(op_in["ion_conc"]) + " -p " + str(inp_top)
+            runCommands(ions_commands, screen=screen)
+            out_gro = [Path("solvated_ions.gro")]
 
+            # insert include ions itp in top file
+            if not '#include "amber99sb-ildn.ff/ions.itp"' in data:
+                with open(inp_top, 'r') as file:
+                    data = file.read()
+                data = data.replace('[ system ]\n', '#include "amber99sb-ildn.ff/ions.itp"\n\n[ system ]\n')
+                with open(inp_top, 'w') as file:
+                    file.write(data)
+        
         op_out = OPIO({
             "out_top": Path(inp_top),
-            "out_gro": out_gros,
+            "out_gro": out_gro, 
         })
-
+        
         return op_out
 
 class PrepRunFEP(OP):
@@ -294,7 +323,11 @@ def FEP_workflow(config_file: str, inp_file_prefix: str = ""):
                              template=PythonOPTemplate(Solvate),
                              parameters={"GMX": GMX,
                                        "box": fep_config["gmx_cmds"]["box"],
-                                       "screen": fep_config["gmx_cmds"]["screen"]},
+                                       "screen": fep_config["gmx_cmds"]["screen"],
+                                       "add_ions": fep_config["gmx_cmds"].get("add_ions", True),
+                                       "ion_conc": fep_config["gmx_cmds"].get("ion_conc", 0.15),
+                                       "sol_group": fep_config["gmx_cmds"].get("sol_group", 15),
+                                       },
                              artifacts={"inp_gro": inp_gro, "inp_top": inp_top},)
             wf.add(solvation)
             step_list.append(solvation)
@@ -330,7 +363,6 @@ def FEP_workflow(config_file: str, inp_file_prefix: str = ""):
                                  parameters={"GMX": GMX,
                                             "screen": fep_config["gmx_cmds"]["screen"],
                                             "run_type": fep_config["run_type"],
-                                            #"num_states": fep_config["num_states"],
                                             "state_range": fep_config["state_range"],
                                             "position_restrict": pos_resctrict,
                                             "num_threads": fep_config["gmx_cmds"]["num_threads"],

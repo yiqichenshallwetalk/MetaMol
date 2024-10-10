@@ -4,7 +4,8 @@
     "solvation": {
         "gmx_cmds": {
             "screen": false,
-            "box": [3.0, 3.0, 3.0]
+            "box": [3.0, 3.0, 3.0],
+            "sol_group": 4
         },
         "input_data": {
             "inp_gro": "lig.gro",

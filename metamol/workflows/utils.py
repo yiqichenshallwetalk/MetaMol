@@ -105,3 +105,24 @@ downloadLocal(wf, step_list[-1], local_path=local_dir)
     """
     with open(filename, "w") as f:
         f.write(fepRunFile)
+
+def _write_ions_mdp():
+    ionsMdp = f"""
+; ions.mdp - used as input into grompp to generate ions.tpr
+; Parameters describing what to do, when to stop and what to save
+integrator  = steep         ; Algorithm (steep = steepest descent minimization)
+emtol       = 1000.0        ; Stop minimization when the maximum force < 1000.0 kJ/mol/nm
+emstep      = 0.01          ; Minimization step size
+nsteps      = 200           ; Maximum number of (minimization) steps to perform
+
+; Parameters describing how to find the neighbors of each atom and how to calculate the interactions
+nstlist         = 1         ; Frequency to update the neighbours list and long range forces
+cutoff-scheme   = Verlet    ; Buffered neighbours searching
+ns_type         = grid      ; Method to determine neighbours list (simple, grid)
+coulombtype     = cutoff    ; Treatment of long range electrostatic interactions
+rcoulomb        = 1.0       ; Short-range electrostatic cut-off
+rvdw            = 1.0       ; Short-range Van der Waals cut-off
+pbc             = xyz       ; Periodic Boundary Conditions in all 3 dimensions
+"""
+    with open('ions.mdp', 'w') as f:
+        f.write(ionsMdp)
