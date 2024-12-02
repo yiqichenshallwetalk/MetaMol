@@ -42,18 +42,18 @@ def add_path(directory_path, filename, path_list):
 def prepare_parallel_runs(config_file: str,
                           num_runs: int = 1,
                           inp_file_prefix: str = "",
-                          work_dir: str = "."):
+                          work_dir: str = ".",
+                          distribute_to_gpu: bool = True):
     import json
-    with open(config_file, 'r') as f:
+    with open(os.path.join(inp_file_prefix, config_file), 'r') as f:
         FEP_configs = json.load(f)
     name = FEP_configs["name"]
     state_range = None
-    for key, fep_config in FEP_configs.items():
+    for _, fep_config in FEP_configs.items():
         if "state_range" in fep_config:
             if not state_range:
                 state_range = fep_config["state_range"]
             else:
-                # state range of diff stages needs to be consistent
                 assert isinstance(state_range, list)
                 assert state_range[0] == fep_config["state_range"][0] and state_range[1] == fep_config["state_range"][1]
 
@@ -75,24 +75,39 @@ def prepare_parallel_runs(config_file: str,
             FEP_configs["name"] = name+str(i+1)
             curr_range = [curr, curr+num_states[i]-1]
             curr += num_states[i]
-            for key, fep_config in FEP_configs.items():
+            for _, fep_config in FEP_configs.items():
                 if "state_range" in fep_config:
                     fep_config["state_range"] = curr_range
+                if distribute_to_gpu and "gmx_cmds" in fep_config:
+                    extra_args = fep_config["gmx_cmds"].get("extra_args", "")
+                    if "gpu" in extra_args:
+                        if "-gpu_id" in extra_args:
+                            extra_args_list = extra_args.split(" ")
+                            for idx in range(len(extra_args_list)):
+                                if extra_args_list[idx] == "-gpu_id":
+                                    break
+                            extra_args_list[idx+1] = str(i)
+                            extra_args = " ".join(extra_args_list)
+                        else:
+                            extra_args += " -gpu_id " + str(i)
+                        
+                        fep_config["gmx_cmds"]["extra_args"] = extra_args
 
-            curr_config_file = "config"+str(i+1)+".json"
+            curr_config_file = "config" + str(i+1) + ".json"
             out_json = open(os.path.join(work_dir, curr_config_file), "w")
-            json.dump(FEP_configs, out_json)
+            json.dump(FEP_configs, out_json, indent=4)
             out_json.close()
-            _write_fep_run_file(os.path.join(work_dir, "fep_run"+str(i+1)+".py"), config_file=curr_config_file, data_dir="data"+str(i+1))
-
-
+            _write_fep_run_file(os.path.join(work_dir, "fep_run" + str(i+1) + ".py"), 
+                                config_file = curr_config_file,
+                                data_dir = "data" + str(i+1))
+    
     return
 
 def _write_fep_run_file(filename: str, config_file: str = "config.json", data_dir: str = "data"):
     fepRunFile = f"""
 from dflow import config
 from metamol.workflows.gromacs_fep import FEP_workflow
-from metamol.workflows.utils import downloadLocal
+from metamol.workflows.utils import download_local
 config["mode"] = "debug"
 
 wf, step_list = FEP_workflow(config_file="{config_file}")
@@ -101,7 +116,7 @@ wf.submit()
 print(wf.query_status())
 
 local_dir = "{data_dir}"
-downloadLocal(wf, step_list[-1], local_path=local_dir)
+download_local(wf, step_list[-1], local_path=local_dir)
     """
     with open(filename, "w") as f:
         f.write(fepRunFile)

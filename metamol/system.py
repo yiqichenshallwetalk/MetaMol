@@ -24,12 +24,7 @@ class System(object):
         self.numAtoms = 0
         self.numBonds = 0
         per = kwargs.get('per', (False, False, False))
-        if box is not None:
-            if not isinstance(box, Iterable) or (len(box) != 3 and len(box) != 6):
-                raise MetaError("Simulation Box bounds not valid")
-            if len(box) == 3:
-                box = [0.0, 0.0, 0.0] + list(box)
-        self._box = Box(bounds=box, angle=box_angle, per=per)
+        self._box = None
         self.dup = []
         self.name = name
         self.numWater = 0
@@ -82,6 +77,15 @@ class System(object):
 
         else:
             raise MetaError("Cannot construct System from the given input")
+        
+        if box is not None:
+            if not isinstance(box, Iterable) or (len(box) != 3 and len(box) != 6):
+                raise MetaError("Simulation Box bounds not valid")
+            if len(box) == 3:
+                box = [0.0, 0.0, 0.0] + list(box)
+            self._box = Box(bounds=box, angle=box_angle, per=per)
+            for frame in self.frames:
+                frame.box = self._box
 
     def readfile(self, filename, smiles=False, file_type=None, timestep=None, **kwargs):
         rw.readfile(filename, host_obj=self, smiles=smiles, file_type=file_type, **kwargs)
@@ -116,6 +120,9 @@ class System(object):
                 self._box = Box(bounds=np.asarray(new_box))
         if angle is not None:
             self._box.angle = angle
+        
+        for frame in self.frames:
+            frame.box = self._box
 
     @property
     def mass(self):
@@ -721,12 +728,11 @@ class System(object):
             rho_all = N*N / vol
             for i in range(N-1):
                 for j in range(i+1, N):
-                    coords1, coords2 = frame.coords[atomlist[i].idx-1], frame.coords[atomlist[j].idx-1]                        
-                    distances.append(distance(coords1, coords2, per=frame.box.per, box=frame.box.lengths))
-
-            for d in distances:
-                if d < rmax:
-                    rdf[int(d/bin)+1] += 2
+                    coords1, coords2 = frame.coords[atomlist[i].idx-1], frame.coords[atomlist[j].idx-1]
+                    d = distance(coords1, coords2, per=frame.box.per, box=frame.box.lengths)
+                    distances.append(d)
+                    if d < rmax:
+                        rdf[int(d/bin)+1] += 2
 
         else:
             M = len(atomlist_other)
@@ -734,14 +740,13 @@ class System(object):
             for i in range(N):
                 for j in range(M):
                     coords1, coords2 = frame.coords[atomlist[i].idx-1], frame.coords[atomlist_other[j].idx-1]
-                    distances.append(distance(coords1, coords2, per=frame.per, box=frame.box.lengths))
-
-            for d in distances:
-                if d < rmax:
-                    rdf[int(d/bin)+1] += 1
+                    d = distance(coords1, coords2, per=frame.box.per, box=frame.box.lengths)
+                    distances.append(d)
+                    if d < rmax:
+                        rdf[int(d/bin)+1] += 1
 
         for idx in range(1, nk+1):
-            rdf[idx] /= rho_all * 4/3*np.pi*(bins[idx]**3 - bins[idx-1]**3)
+            rdf[idx] /= rho_all * 4/3 * np.pi * (bins[idx]**3 - bins[idx-1]**3)
 
         return bins, rdf
 
